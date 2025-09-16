@@ -1,0 +1,260 @@
+以下整理你新提供嘅 log（UnicodeDecodeError + subprocess safe retry）再配合之前 crash log 做更聚焦分析，同埋畀出可立即落手做嘅修正建議。
+
+1. 新增錯誤重點
+你而家見到兩組核心問題：
+
+A. UnicodeDecodeError
+Code
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0x94 in position 7939: invalid start byte
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0x94 in position 495: invalid start byte
+0x94（十六進制）喺 Windows-1252 / CP950 常見係「右雙引號」或其他本地字符，代表：
+
+子進程（worker）輸出嘅 stdout 內容唔係 UTF-8
+但主進程用 text=True（= 預設按 UTF-8 或 locale 嘗試解碼）去讀
+當 Python 對 pipe 進行解碼時崩喺 _readerthread，buffer 最終冇正確拼好 → 後續你 JSON 解析報：
+Code
+TypeError: the JSON object must be str, bytes or bytearray, not NoneType
+係因為 stdout 無 / 失敗 / 變成 None 或空字串。
+B. Safe retry 流程亦失敗
+Code
+normal_mode_failed → safe_retry_start → safe_retry_failed
+代表第一次跑出錯，再用「安全模式」重跑仍然冇得到有效 JSON。
+
+C. 相關檔案資訊
+Code
+[file_info] 大小: 0 MB
+顯示你要處理嘅 Excel 暫存檔（cache_folder 裏面）實際大小可能係 0（或者仲未寫好就被讀），潛在：
+
+下載 / 複製未完成
+同名被另一個 thread/subprocess 覆寫並 truncate
+用開檔模式 'w' 而未 flush/close
+race condition：主流程派工作太快
+D. 與之前 C 層 crash 的關聯
+之前 0x80000003 可能係另一條線程解析異常 / 內部 debug trap。若有：
+
+不完整 XML / 空檔 / 損壞內容
+同一份資料被多條 thread 同時讀寫
+觸發 ElementTree / GC 係 C 層面 crash 這與你而家見到的「0 bytes file + 子進程編碼錯亂」其實係同一串供應鏈問題：輸入資料不穩定 + 並發處理次序混亂。
+2. 最可能根源（由高到低）
+子進程 worker 輸出非 UTF-8（Windows locale / 預設 code page）
+worker 將二進制數據（例如直接 print 讀到的 XLSX bytes / 轉碼前 buffer）寫到 stdout
+stdout 被 UnicodeDecodeError 中斷，主程式收唔到完整 JSON → JSON decode None
+產生 XML / 中介檔案時 race：文件尚未完成（0 bytes）就開始 parse
+Safe retry 沿用同一壞輸入（未做隔離 / deep copy / 再檢查 size）→ 再失敗
+多 thread + 檔案名衝突或未鎖定（cache_folder 用 deterministic file name）
+ElementTree 解析空或截斷 XML 內容 → 之前的 C 層崩潰
+3. 優先修正步驟（短期可落地）
+3.1 保證子進程輸出純淨 UTF-8 JSON
+喺 worker 腳本（假設名稱類似 xml_worker.py）最開頭加：
+
+Python
+import sys, json, os
+sys.stdout.reconfigure(encoding='utf-8')
+sys.stderr.reconfigure(encoding='utf-8')
+# 確保唔輸出除 JSON 之外嘅 debug（或將 debug 去 stderr）
+主程式 spawn 時加：
+
+Python
+subprocess.run(
+    [...],
+    capture_output=True,
+    text=True,
+    encoding="utf-8",
+    errors="strict"  # 或 'replace' 做過渡
+)
+亦可以強制：
+
+設環境變數：PYTHONUTF8=1 或啟動參數 -X utf8
+若第三方庫打印非 UTF-8，可暫時 errors='replace'（同時標示 output degraded）
+3.2 阻止二進制污染 stdout
+檢查 worker 有無類似：
+
+Python
+print(binary_data)
+或意外把 open(xlsx, 'rb').read()直接 print。
+二進制要：
+
+轉 base64 → JSON
+或完全唔經 stdout，改用臨時檔 / memory map
+3.3 主程式應對「stdout 空 / decode 失敗」
+包一層健壯性：
+
+Python
+result = subprocess.run(...)
+
+if result.returncode != 0:
+    log_error("worker non-zero exit", rc=result.returncode, stderr=result.stderr[:500])
+    return Fail("worker_exit")
+
+if not result.stdout or not result.stdout.strip():
+    log_error("worker produced empty stdout")
+    return Fail("empty_stdout")
+
+try:
+    data = json.loads(result.stdout)
+except json.JSONDecodeError as e:
+    log_error("invalid_json", head=result.stdout[:200], err=str(e))
+    return Fail("json_decode")
+3.4 Safe retry 要「更安全」
+現在 retry 再跑一次好似仍用同一個爛輸入。改進：
+
+retry 前重新驗證：檔案 size > 0 && 最近修改時間穩定（例如 sleep 0.2s 再 stat，兩次一致）
+如 size=0 立即標記為「輸入無效」，唔好再進行 XML parse
+產生一個 copy：copy2(original, temp_unique_name) 再交給 worker，避免被後續邏輯改寫
+3.5 File race 防護
+加一個工具函數：
+
+Python
+import time, os
+
+def wait_stable(path, attempts=5, interval=0.2):
+    prev = None
+    for _ in range(attempts):
+        try:
+            s = os.stat(path)
+            sig = (s.st_size, s.st_mtime_ns)
+            if sig == prev and s.st_size > 0:
+                return True
+            prev = sig
+        except FileNotFoundError:
+            pass
+        time.sleep(interval)
+    return False
+喺派工作前：
+
+Python
+if not wait_stable(file_path):
+    log_error("file_not_stable_or_empty", path=file_path)
+    return Fail("unstable_file")
+3.6 避免 0 bytes 中途 parse
+在 read_values_from_xlsx_via_polars_xml() 開始第一行檢查：
+
+Python
+size = os.path.getsize(xlsx_path)
+if size == 0:
+    raise RuntimeError(f"Input XLSX is empty: {xlsx_path}")
+3.7 生成臨時檔命名策略
+使用：
+
+Python
+import uuid, pathlib
+tmp_dir = pathlib.Path(cache_folder)
+unique = tmp_dir / f"{uuid.uuid4().hex}_{original_name}"
+# 操作完成後再 rename 到正式名字（atomic replace）
+確保其他 Thread 唔會讀到半成品。
+
+3.8 線程池 + 子進程配合
+現時 XMLSubprocessManager 用 ThreadPoolExecutor 其實係 threads 去呼叫 subprocess。若大量 I/O + 等待，OK；但如果邏輯重 CPU / 有 GIL 競爭，可以改：
+
+主流程只放入「指令描述」到一個 queue
+一個專職 loop 控制 subprocess 順序（或用 ProcessPool 直接處理）
+3.9 監控與診斷加強
+加統計：
+
+失敗類型分類計數（decode_error / empty / json_error / timeout）
+對每個 worker 保存最近一份 stdout snapshot (前 N chars) 方便追查
+3.10 防止再出現 Windows-1252 字符
+在 worker 任何地方若要讀文本：
+
+Python
+open(path, 'r', encoding='utf-8', errors='strict')
+若你真係要兼容 CP950 或 Big5，可以：
+
+嘗試先以 UTF-8 讀，失敗 fallback 至 'cp950'，但最終輸出 JSON 時都用 UTF-8 編碼。
+4. 中長期重構建議
+目標	做法
+消除中介 XML 崩潰點	直接用 openpyxl / polars 讀 Excel → 結構化資料，無需自製 XML
+解析隔離	用獨立 worker process（multiprocessing 或專用長駐子進程）取代多次啟動 subprocess.run
+通訊協定穩定	stdout 僅輸出單行 JSON；複雜資料用臨時檔 + 傳路徑
+防止 GC + C 崩潰	移除在多線程中同時對 ElementTree 進行大量 parse，可單線程 serialize
+回放重現	保存錯誤任務：輸入檔案副本 + worker stdout/stderr + 時間戳
+5. 立即可以貼入專案嘅示例片段
+5.1 安全運行 subprocess（改良版）
+Python
+import subprocess, json, time, os, sys
+
+def run_xml_worker(cmd, timeout, work_id, input_file):
+    start = time.time()
+    try:
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="strict",
+            timeout=timeout,
+            env=dict(os.environ, PYTHONUTF8="1")
+        )
+    except subprocess.TimeoutExpired as e:
+        return {"ok": False, "reason": "timeout", "elapsed": time.time()-start, "work_id": work_id}
+
+    stdout = proc.stdout
+    if proc.returncode != 0:
+        return {
+            "ok": False,
+            "reason": "nonzero_exit",
+            "rc": proc.returncode,
+            "stderr_head": (proc.stderr or "")[:400],
+            "elapsed": time.time()-start,
+            "work_id": work_id
+        }
+    if not stdout or not stdout.strip():
+        return {"ok": False, "reason": "empty_stdout", "elapsed": time.time()-start}
+
+    try:
+        data = json.loads(stdout)
+    except json.JSONDecodeError as je:
+        return {
+            "ok": False,
+            "reason": "json_decode",
+            "error": str(je),
+            "stdout_head": stdout[:300],
+            "elapsed": time.time()-start
+        }
+    return {"ok": True, "data": data, "elapsed": time.time()-start}
+5.2 Worker 開頭（確保 UTF-8）
+Python
+# xml_worker.py
+import sys, json
+sys.stdout.reconfigure(encoding='utf-8')
+sys.stderr.reconfigure(encoding='utf-8')
+
+def main():
+    # 只輸出 JSON，避免混雜文字
+    result = {"status": "ok", "values": []}
+    print(json.dumps(result), flush=True)
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as e:
+        # 最後防線：輸出錯誤 JSON
+        err = {"status": "error", "type": type(e).__name__, "msg": str(e)}
+        print(json.dumps(err), flush=True)
+        sys.exit(1)
+6. 建議你提供的額外程式碼（方便下一步更準確分析）
+請（如方便）貼：
+
+utils/xml_subproc.py 內：執行 subprocess 的方法（現在只睇到前 88 行，未見 run 部分）
+產生 / 複製 Excel 至 cache_folder 的代碼
+worker 腳本（如果存在）
+read_values_from_xlsx_via_polars_xml() 附近（行 130–170）
+你設定 safe_retry 時的具體流程（例如判斷條件）
+（目前我只睇到局部檔案，搜尋結果可能未齊全。）
+
+7. 快速檢查清單
+項目	立即檢查
+子進程 stdout 是否有非 JSON 內容	是 / 否
+是否有 print 原始二進制	是 / 否
+是否強制 UTF-8 環境	已加 / 未加
+檔案 size 0 時是否照樣排任務	是 / 否
+同一檔名是否同時被多條任務處理	可能 / 不會
+Retry 前是否驗證檔案穩定	有 / 無
+JSON loads 前檢查 stdout 是否 empty	有 / 無
+Worker 是否可能使用系統 locale (cp950/1252)	可能 / 否
+8. 總結
+現階段最關鍵：保證（1）輸入檔案有效且穩定、（2）子進程輸出單一、乾淨、UTF-8 編碼 JSON、（3）主程式對空 / 壞輸出有防護，避免 propagate 到後面 C 層 XML parse。解決 UnicodeDecodeError 後，你之前的 0x80000003 crash 很大機率會顯著下降，剩餘問題就容易用最小化重現法針對 ElementTree 或資料內容。
+
+如果你再提供上面提到的幾段程式碼，我可以幫你做逐行風險註解（甚至給 patch 建議）。
+
+有新資料再覆，我再幫你跟進。加油！
