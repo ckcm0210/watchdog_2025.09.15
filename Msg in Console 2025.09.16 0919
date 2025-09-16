@@ -1,0 +1,42 @@
+File "C:\ProgramData\anaconda3ALib\subprocess.py", line 1568, in _readerthread
+buffer.append(th.read())
+File "<frozen codecs>", line 322, in decode
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0x94 in position 7939: invalid start byte
+File "<frozen codecs>", line 322, in decode
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0x94 in position 420: invalid start byte
+2025-09-16 09:19:03 [xmi-subproc] error worker_id=11 elapsed=3.0s error=TypeError: the JSON object must be str, bytes or bytearray, not NoneType
+2025-09-16 09:19:03 [xmi-subproc] normal_mode_failed worker_id=11 error=TypeError: the JSON object must be str, bytes or bytearray, not NoneType
+2025-09-16 09:19:03 [xmi-subproc] safe_retry_start_worker_id=12 file=<9d003d501e93_Session_2025-07-03_16-05-35.xlsx timeout=130.0s
+2025-09-16 09:19:03 [xmi-subproc] safe_mode_timeout info worker_id=12: 安全模式子进程有 130.0 秒超时 (timeout=130.0s)
+2025-09-16 09:19:03 [xmi-subproc] start_worker_id=12 task=read_values file=9d003d501e93_Session_2025-07-03_16-05-35.xlsx timeout=120.0s
+2025-09-16 09:19:03 [xmi-subproc] subprocess_timeout info worker_id=12: 子进程有 120.0 秒超时 (timeout=120.0s)
+2025-09-16 09:19:05 [health] [warn] no events for 31.4s (threshold=20.0s)
+Exception in thread Thread-42 (_readerthread):
+Traceback (most recent call last):
+  File "C:\ProgramData\anaconda3ALib\threading.py", line 1038, in _bootstrap_inner
+  File "C:\ProgramData\anaconda3ALib\threading.py", line 975, in run
+  File "C:\ProgramData\anaconda3ALib\threading.py", line 975, in run
+  File "<lambda>", line 1, in <lambda>
+  File "<lambda>", line 1, in <lambda>
+  File "C:\ProgramData\anaconda3ALib\subprocess.py", line 1568, in _readerthread
+buffer.append(th.read())
+File "<frozen codecs>", line 322, in decode
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0x94 in position 495: invalid start byte
+buffer.append(th.read())
+File "<frozen codecs>", line 322, in decode
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0x94 in position 7939: invalid start byte
+2025-09-16 09:19:06 [xmi-subproc] error worker_id=12 elapsed=3.0s error=TypeError: the JSON object must be str, bytes or bytearray, not NoneType
+2025-09-16 09:19:06 [xmi-subproc] safe_retry_failed worker_id=12 error=TypeError: the JSON object must be str, bytes or bytearray, not NoneType
+2025-09-16 09:19:06 [file_info] 大小: 0 MB
+2025-09-16 09:19:06 [file_info] 修改時間: 2025-09-16 09:18:11 972196
+2025-09-16 09:19:06 [file_info] 存取時間: 2025-09-16 09:18:11 952229
+2025-09-16 09:19:06 [file_info] 創建時間: 2025-09-16 09:18:11 952229
+2025-09-16 09:19:06 [memory] 記憶體: 528.03 MB
+2025-09-16 09:19:06 [info] 路徑: D:\PZone\watchdog\cache_folder\9f5003d501e93_Session_2025-07-03_16-05-35.xlsx
+2025-09-16 09:19:07 [memory] 記憶體: 528.10 MB
+2025-09-16 09:19:07 [info] 路徑: D:\PZone\watchdog\cache_folder\9f5003d501e93_Session_2025-07-03_16-05-35.xlsx 的總覽
+2025-09-16 09:19:10 [timeline-no-change] 總覽圖: Session 2025-07-03 16-05-35.xlsx 的總覽
+2025-09-16 09:19:10 [timeline-no-change] 總覽圖: Session 2025-07-03 16-05-35.xlsx .silent=False, is_polling=False
+2025-09-16 09:19:10 [timeline-matrix-clean] HTML 報表: D:\PZone\watchdog\csv\timeline_index2.html
+2025-09-16 09:19:10 [timeline-matrix-clean] HTML 報表: D:\PZone\watchdog\csv\timeline_index2.html
+2025-09-16 09:19:10 [timeline-matrix-no-change] 總覽圖: Session 2025-07-03 16-05-35.xlsx by koCheng
