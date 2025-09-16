@@ -1,0 +1,54 @@
+python_crash_20250916_091715.log - 受保護的幕布 e-locker
+(有標記) 編輯(E) 編輯(O) 檢視(V) 說明(H)
+程式崩潰: 2025-09-16 09:17:15.820028, Inc. | main, Apr 19 2023, 14:46:34) (MSC v.1916 64 bit (AMD64))
+Python 執行階段: 3.11.3 | packaged by Anaconda, Inc. | (main, Apr 19 2023, 14:46:34) [MSC v.1916 64 bit (AMD64))
+
+Windows fatal exception: code 0x80000003
+
+Thread 0x0000820 (most recent call first):
+  File "C:\ProgramData\anaconda3\Lib\threading.py", line 324 in wait
+  File "C:\ProgramData\anaconda3\Lib\threading.py", line 1038 in _bootstrap_inner
+  File "C:\ProgramData\anaconda3\Lib\threading.py", line 995 in _bootstrap
+
+Current thread 0x00005dc (most recent call first):
+  Garbage-collecting
+  File "C:\ProgramData\anaconda3\Lib\xml\etree\ElementTree.py", line 1333 in XML
+  File "C:\ProDir\KCHENG\watchdog_monitoring_v13utils\value_engine\xmlars_xml_reader.py", line 152 in read_values_from_xlsx_via_polars_xml
+  File "C:\ProDir\KCHENG\watchdog_monitoring_v13core\excel_parser.py", line 452 in dump_excel_cells_with_timeout
+  File "C:\ProDir\KCHENG\watchdog_monitoring_v13core\comparison.py", line 314 in compare_excel_changes
+  File "C:\ProDir\KCHENG\watchdog_monitoring_v13utils\task_queue.py", line 57 in run
+  File "C:\ProgramData\anaconda3\Lib\concurrent\futures\thread.py", line 83 in _worker
+  File "C:\ProgramData\anaconda3\Lib\threading.py", line 975 in run
+  File "C:\ProgramData\anaconda3\Lib\threading.py", line 1038 in _bootstrap_inner
+  File "C:\ProgramData\anaconda3\Lib\threading.py", line 995 in _bootstrap
+
+Thread 0x0000542 (most recent call first):
+  File "C:\ProgramData\anaconda3\Lib\subprocess.py", line 1509 in _execute_child
+  File "C:\ProgramData\anaconda3\Lib\subprocess.py", line 160 in run
+  File "C:\ProDir\KCHENG\watchdog_monitoring_v13utils\xml_subproc.py", line 58 in run_subprocess_task
+  File "C:\ProgramData\anaconda3\Lib\concurrent\futures\thread.py", line 83 in _worker
+  File "C:\ProgramData\anaconda3\Lib\threading.py", line 975 in run
+  File "C:\ProgramData\anaconda3\Lib\threading.py", line 1038 in _bootstrap_inner
+  File "C:\ProgramData\anaconda3\Lib\threading.py", line 995 in _bootstrap
+
+Thread 0x000057b (most recent call first):
+  File "C:\ProgramData\anaconda3\Lib\threading.py", line 324 in wait
+  File "C:\ProDir\KCHENG\watchdog_monitoring_v13utils\xml_subproc.py", line 311 in try_safe_mode
+  File "C:\ProDir\KCHENG\watchdog_monitoring_v13utils\xml_subproc.py", line 288 in execute_task
+  File "C:\ProDir\KCHENG\watchdog_monitoring_v13utils\xml_subproc.py", line 450 in read_values_subprocess
+  File "C:\ProDir\KCHENG\watchdog_monitoring_v13core\excel_parser.py", line 419 in dump_excel_cells_with_timeout
+  File "C:\ProDir\KCHENG\watchdog_monitoring_v13core\comparison.py", line 314 in compare_excel_changes
+  File "C:\ProDir\KCHENG\watchdog_monitoring_v13utils\task_queue.py", line 402 in modified
+  File "C:\ProgramData\anaconda3\Lib\concurrent\futures\thread.py", line 83 in _worker
+  File "C:\ProgramData\anaconda3\Lib\threading.py", line 975 in run
+  File "C:\ProgramData\anaconda3\Lib\threading.py", line 1038 in _bootstrap_inner
+  File "C:\ProgramData\anaconda3\Lib\threading.py", line 995 in _bootstrap
+
+Thread 0x00005f8 (most recent call first):
+  File "C:\ProgramData\anaconda3\Lib\threading.py", line 324 in wait
+  File "C:\ProgramData\anaconda3\Lib\watchdog\observers\watchdog_v13api.py", line 301 in read_directory_changes
+  File "C:\ProgramData\anaconda3\Lib\watchdog\observers\watchdog_v13api.py", line 80 in read_events
+  File "C:\ProgramData\anaconda3\Lib\watchdog\observers\watchdog_v13api.py", line 148 in run
+  File "C:\ProgramData\anaconda3\Lib\threading.py", line 975 in run
+  File "C:\ProgramData\anaconda3\Lib\threading.py", line 1038 in _bootstrap_inner
+  File "C:\ProgramData\anaconda3\Lib\threading.py", line 995 in _bootstrap
